@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import MeshNetwork from './MeshNetwork';
+import { Device } from '../types';
 
 // Fix for default marker icons in Next.js
 const createCustomIcon = (color: string) => {
@@ -31,24 +32,6 @@ const THRESHOLDS = {
     max: 1020
   }
 };
-
-// Define the device type
-interface Device {
-  id: string;
-  name: string;
-  position: [number, number];
-  status: 'Online' | 'Offline';
-  temperature: number;
-  humidity: number;
-  pressure: number;
-  type: 'official' | 'kit';
-  icon: L.DivIcon;
-  connectedTo: string[];
-  signalStrength: number;
-  batteryLevel: number;
-  lastAlert?: string; // Last alert received from command center
-  lastReading?: string; // Last sensor reading sent to command center
-}
 
 // Sample device data with more nodes
 const devices: Device[] = [
@@ -183,11 +166,12 @@ const devices: Device[] = [
 interface MapProps {
   center?: [number, number];
   zoom?: number;
+  devices?: Device[];
 }
 
-export default function Map({ center = [43.0481, -76.1474], zoom = 13 }: MapProps) {
+export default function Map({ center = [43.0481, -76.1474], zoom = 13, devices: initialDevices }: MapProps) {
   const [mounted, setMounted] = useState(false);
-  const [deviceData, setDeviceData] = useState<Device[]>(devices);
+  const [deviceData, setDeviceData] = useState<Device[]>(initialDevices || devices);
   const [activeConnections, setActiveConnections] = useState<string[]>([]);
   const [messageLog, setMessageLog] = useState<{from: string, to: string, message: string, timestamp: string, path?: string[]}[]>([]);
   const [alertMode, setAlertMode] = useState(false);
@@ -288,7 +272,7 @@ export default function Map({ center = [43.0481, -76.1474], zoom = 13 }: MapProp
       ]);
       
       // Also add to message log
-      const alertMessages = [];
+      const alertMessages: string[] = [];
       
       if (readings.temperature) {
         alertMessages.push(
@@ -356,7 +340,7 @@ export default function Map({ center = [43.0481, -76.1474], zoom = 13 }: MapProp
   }, [mounted]);
 
   // Find the shortest path between two nodes using Dijkstra's algorithm
-  const findShortestPath = (startId: string, endId: string): string[] => {
+  const findShortestPath = useCallback((startId: string, endId: string): string[] => {
     const distances: { [key: string]: number } = {};
     const previous: { [key: string]: string } = {};
     const unvisited = new Set<string>();
@@ -419,7 +403,7 @@ export default function Map({ center = [43.0481, -76.1474], zoom = 13 }: MapProp
     
     path.unshift(startId);
     return path;
-  };
+  }, [deviceData]);
 
   // Function to send alert from command center to all kits
   const sendAlertToAllKits = () => {
@@ -588,7 +572,7 @@ export default function Map({ center = [43.0481, -76.1474], zoom = 13 }: MapProp
     }, 3000);
     
     return () => clearInterval(interval);
-  }, [mounted, deviceData]);
+  }, [mounted, deviceData, findShortestPath]);
 
   if (!mounted) {
     return <div className="map-loading">Loading map...</div>;
@@ -614,7 +598,11 @@ export default function Map({ center = [43.0481, -76.1474], zoom = 13 }: MapProp
         />
         
         {deviceData.map(device => (
-          <Marker key={device.id} position={device.position} icon={device.icon}>
+          <Marker 
+            key={device.id} 
+            position={device.position} 
+            icon={device.icon || undefined}
+          >
             <Popup>
               <div className="popup-content">
                 <h3>{device.name}</h3>

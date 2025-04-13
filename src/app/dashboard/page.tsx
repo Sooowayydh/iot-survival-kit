@@ -1,32 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
-
-// Define interfaces
-interface Device {
-  id: string;
-  name: string;
-  position: [number, number];
-  temperature: number;
-  humidity: number;
-  pressure: number;
-  connectedTo: string[];
-  status: 'Online' | 'Offline';
-  type: 'official' | 'kit';
-  icon: any; // L.DivIcon type
-  signalStrength: number;
-  batteryLevel: number;
-  lastAlert?: string;
-  lastReading?: string;
-}
+import { Device } from '../types';
 
 // Dynamically import the Map component with no SSR
 const Map = dynamic(() => import('../components/Map'), { ssr: false });
 
 export default function Dashboard() {
   const [devices, setDevices] = useState<Device[]>([]);
+  const devicesRef = useRef<Device[]>([]);
 
   // Initialize devices and start monitoring
   useEffect(() => {
@@ -160,21 +144,23 @@ export default function Dashboard() {
       }
     ];
     setDevices(initialDevices);
+    devicesRef.current = initialDevices;
 
     // Start monitoring for device updates
     const interval = setInterval(() => {
       // Simulate new readings
-      const newDevices = devices.map(device => ({
+      const newDevices = devicesRef.current.map(device => ({
         ...device,
         temperature: Number((device.temperature + (Math.random() - 0.5)).toFixed(1)),
         humidity: Number((device.humidity + (Math.random() - 0.5)).toFixed(1)),
         pressure: Number((device.pressure + (Math.random() - 0.5)).toFixed(1))
       }));
       setDevices(newDevices);
+      devicesRef.current = newDevices;
     }, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, []); // No dependencies needed with useRef
 
   return (
     <div className="dashboard-container">

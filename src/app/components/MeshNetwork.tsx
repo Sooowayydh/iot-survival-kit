@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Polyline, useMap } from 'react-leaflet';
-import L from 'leaflet';
 
 interface MeshNode {
   id: string;
@@ -25,6 +24,9 @@ export default function MeshNetwork({ nodes, activeConnections }: MeshNetworkPro
   
   // Generate connections between nodes
   useEffect(() => {
+    const mapCenter = map.getCenter();
+    console.log(`Map center: ${mapCenter.lat}, ${mapCenter.lng}`);
+    
     const newConnections: {from: string, to: string, active: boolean}[] = [];
     
     // Connect command center to all survival kits
@@ -53,7 +55,7 @@ export default function MeshNetwork({ nodes, activeConnections }: MeshNetworkPro
     });
     
     setConnections(newConnections);
-  }, [nodes, activeConnections]);
+  }, [nodes, activeConnections, map]);
   
   // Get node position by ID
   const getNodePosition = (id: string): [number, number] => {
