@@ -1,93 +1,107 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Polyline, useMap } from 'react-leaflet';
-
-interface MeshNode {
-  id: string;
-  name: string;
-  position: [number, number];
-  type: 'official' | 'kit';
-  status: 'Online' | 'Offline';
-  connectedTo: string[];
-  signalStrength: number;
-}
+import { useEffect, useRef } from 'react';
+import { useMap } from 'react-leaflet';
+import { Device } from '../types';
+import { findShortestPath } from '../data/devices';
+import '../styles/Map.css';
 
 interface MeshNetworkProps {
-  nodes: MeshNode[];
+  nodes: Device[];
   activeConnections: string[];
 }
 
 export default function MeshNetwork({ nodes, activeConnections }: MeshNetworkProps) {
   const map = useMap();
-  const [connections, setConnections] = useState<{from: string, to: string, active: boolean}[]>([]);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationFrameRef = useRef<number | undefined>(undefined);
   
-  // Generate connections between nodes
   useEffect(() => {
-    const mapCenter = map.getCenter();
-    console.log(`Map center: ${mapCenter.lat}, ${mapCenter.lng}`);
+    if (!canvasRef.current) return;
     
-    const newConnections: {from: string, to: string, active: boolean}[] = [];
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     
-    // Connect command center to all survival kits
-    const commandCenter = nodes.find(node => node.type === 'official');
-    if (commandCenter) {
-      nodes.forEach(node => {
-        if (node.type === 'kit') {
-          newConnections.push({
-            from: commandCenter.id,
-            to: node.id,
-            active: activeConnections.includes(`${commandCenter.id}-${node.id}`)
-          });
+    // Set canvas size to match map container
+    const updateCanvasSize = () => {
+      const mapContainer = map.getContainer();
+      canvas.width = mapContainer.clientWidth;
+      canvas.height = mapContainer.clientHeight;
+    };
+    
+    updateCanvasSize();
+    
+    // Update canvas size when map is resized
+    const resizeObserver = new ResizeObserver(updateCanvasSize);
+    resizeObserver.observe(map.getContainer());
+    
+    // Animation function to draw connections
+    const animate = () => {
+      if (!ctx) return;
+      
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw connections
+      activeConnections.forEach(connection => {
+        const [fromId, toId] = connection.split('-');
+        const fromNode = nodes.find(n => n.id === fromId);
+        const toNode = nodes.find(n => n.id === toId);
+        
+        if (fromNode && toNode) {
+          const fromPoint = map.latLngToContainerPoint(fromNode.position);
+          const toPoint = map.latLngToContainerPoint(toNode.position);
+          
+          // Draw line with gradient
+          const gradient = ctx.createLinearGradient(fromPoint.x, fromPoint.y, toPoint.x, toPoint.y);
+          gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)'); // Blue with 50% opacity
+          gradient.addColorStop(1, 'rgba(16, 185, 129, 0.5)'); // Green with 50% opacity
+          
+          ctx.beginPath();
+          ctx.moveTo(fromPoint.x, fromPoint.y);
+          ctx.lineTo(toPoint.x, toPoint.y);
+          ctx.strokeStyle = gradient;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Draw animated dots along the path
+          const time = Date.now() / 1000;
+          const dotCount = 3;
+          
+          for (let i = 0; i < dotCount; i++) {
+            const t = ((time + i / dotCount) % 1);
+            const x = fromPoint.x + (toPoint.x - fromPoint.x) * t;
+            const y = fromPoint.y + (toPoint.y - fromPoint.y) * t;
+            
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.8)'; // Blue with 80% opacity
+            ctx.fill();
+          }
         }
       });
-    }
-    
-    // Connect survival kits to each other (mesh network)
-    nodes.filter(node => node.type === 'kit').forEach((kit, index, kits) => {
-      // Connect to next kit in the array (circular)
-      const nextKit = kits[(index + 1) % kits.length];
-      newConnections.push({
-        from: kit.id,
-        to: nextKit.id,
-        active: activeConnections.includes(`${kit.id}-${nextKit.id}`)
-      });
-    });
-    
-    setConnections(newConnections);
-  }, [nodes, activeConnections, map]);
-  
-  // Get node position by ID
-  const getNodePosition = (id: string): [number, number] => {
-    const node = nodes.find(n => n.id === id);
-    return node ? node.position : [0, 0];
-  };
-  
-  // Create a pulsing effect for active connections
-  const getLineStyle = (active: boolean) => {
-    return {
-      color: active ? '#3b82f6' : '#94a3b8',
-      weight: active ? 3 : 1,
-      opacity: active ? 0.8 : 0.3,
-      dashArray: active ? '5, 10' : '5, 5',
-      animate: active
+      
+      // Schedule next frame
+      animationFrameRef.current = requestAnimationFrame(animate);
     };
-  };
+    
+    // Start animation
+    animate();
+    
+    // Cleanup
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      resizeObserver.disconnect();
+    };
+  }, [map, nodes, activeConnections]);
   
   return (
-    <>
-      {connections.map((connection, index) => {
-        const fromPos = getNodePosition(connection.from);
-        const toPos = getNodePosition(connection.to);
-        
-        return (
-          <Polyline
-            key={`${connection.from}-${connection.to}-${index}`}
-            positions={[fromPos, toPos]}
-            pathOptions={getLineStyle(connection.active)}
-          />
-        );
-      })}
-    </>
+    <canvas
+      ref={canvasRef}
+      className="mesh-network-canvas"
+    />
   );
 } 

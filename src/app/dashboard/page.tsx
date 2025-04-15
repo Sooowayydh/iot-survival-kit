@@ -1,171 +1,227 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import 'leaflet/dist/leaflet.css';
 import { Device } from '../types';
+import { devices, THRESHOLDS } from '../data/devices';
+import '../styles/Map.css';
 
-// Dynamically import the Map component with no SSR
-const Map = dynamic(() => import('../components/Map'), { ssr: false });
+// Dynamically import the Map component to avoid SSR issues with Leaflet
+const Map = dynamic(() => import('../components/Map'), {
+  ssr: false,
+  loading: () => <div className="loading-container"><p className="loading-text">Loading map...</p></div>
+});
 
 export default function Dashboard() {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const devicesRef = useRef<Device[]>([]);
+  const [devicesData, setDevicesData] = useState<Device[]>(devices);
+  const [commandInput, setCommandInput] = useState('');
+  const [commandLog, setCommandLog] = useState<{command: string, timestamp: string}[]>([]);
+  const [thresholdAlerts, setThresholdAlerts] = useState<{
+    deviceId: string;
+    deviceName: string;
+    timestamp: string;
+    readings: {
+      temperature?: { value: number; threshold: number; type: 'min' | 'max' };
+      humidity?: { value: number; threshold: number; type: 'min' | 'max' };
+      pressure?: { value: number; threshold: number; type: 'min' | 'max' };
+    };
+  }[]>([]);
+  const [isClient, setIsClient] = useState(false);
 
-  // Initialize devices and start monitoring
+  // Set client state to avoid hydration issues
   useEffect(() => {
-    // Initial device data
-    const initialDevices: Device[] = [
-      {
-        id: '1',
-        name: 'Command Center',
-        position: [43.0481, -76.1474],
-        temperature: 25.5,
-        humidity: 60.0,
-        pressure: 1013.2,
-        connectedTo: ['2', '3', '4', '5', '6', '7', '8', '9'],
-        status: 'Online',
-        type: 'official',
-        icon: null,
-        signalStrength: 100,
-        batteryLevel: 100
-      },
-      {
-        id: '2',
-        name: 'Survival Kit #1',
-        position: [43.0592, -76.1435],
-        temperature: 26.0,
-        humidity: 55.0,
-        pressure: 1012.8,
-        connectedTo: ['1', '3', '5', '7'],
-        status: 'Online',
-        type: 'kit',
-        icon: null,
-        signalStrength: 85,
-        batteryLevel: 92
-      },
-      {
-        id: '3',
-        name: 'Survival Kit #2',
-        position: [43.0483, -76.1586],
-        temperature: 24.5,
-        humidity: 62.0,
-        pressure: 1013.5,
-        connectedTo: ['1', '2', '4', '6', '8'],
-        status: 'Online',
-        type: 'kit',
-        icon: null,
-        signalStrength: 75,
-        batteryLevel: 88
-      },
-      {
-        id: '4',
-        name: 'Survival Kit #3',
-        position: [43.0374, -76.1467],
-        temperature: 25.8,
-        humidity: 58.0,
-        pressure: 1012.5,
-        connectedTo: ['1', '3', '5', '9'],
-        status: 'Online',
-        type: 'kit',
-        icon: null,
-        signalStrength: 90,
-        batteryLevel: 95
-      },
-      {
-        id: '5',
-        name: 'Survival Kit #4',
-        position: [43.0525, -76.1325],
-        temperature: 25.2,
-        humidity: 59.0,
-        pressure: 1013.0,
-        connectedTo: ['1', '2', '4', '6', '7'],
-        status: 'Online',
-        type: 'kit',
-        icon: null,
-        signalStrength: 80,
-        batteryLevel: 87
-      },
-      {
-        id: '6',
-        name: 'Survival Kit #5',
-        position: [43.0436, -76.1625],
-        temperature: 24.8,
-        humidity: 61.0,
-        pressure: 1012.2,
-        connectedTo: ['1', '3', '5', '8'],
-        status: 'Online',
-        type: 'kit',
-        icon: null,
-        signalStrength: 70,
-        batteryLevel: 93
-      },
-      {
-        id: '7',
-        name: 'Survival Kit #6',
-        position: [43.0625, -76.1525],
-        temperature: 25.1,
-        humidity: 57.0,
-        pressure: 1013.8,
-        connectedTo: ['1', '2', '5', '8'],
-        status: 'Online',
-        type: 'kit',
-        icon: null,
-        signalStrength: 95,
-        batteryLevel: 89
-      },
-      {
-        id: '8',
-        name: 'Survival Kit #7',
-        position: [43.0385, -76.1685],
-        temperature: 24.3,
-        humidity: 63.0,
-        pressure: 1011.5,
-        connectedTo: ['1', '3', '6', '7', '9'],
-        status: 'Online',
-        type: 'kit',
-        icon: null,
-        signalStrength: 65,
-        batteryLevel: 91
-      },
-      {
-        id: '9',
-        name: 'Survival Kit #8',
-        position: [43.0275, -76.1385],
-        temperature: 25.7,
-        humidity: 56.0,
-        pressure: 1012.0,
-        connectedTo: ['1', '4', '8'],
-        status: 'Online',
-        type: 'kit',
-        icon: null,
-        signalStrength: 85,
-        batteryLevel: 94
-      }
-    ];
-    setDevices(initialDevices);
-    devicesRef.current = initialDevices;
+    setIsClient(true);
+  }, []);
 
-    // Start monitoring for device updates
+  // Simulate real-time updates for device data
+  useEffect(() => {
+    if (!isClient) return;
+    
     const interval = setInterval(() => {
-      // Simulate new readings
-      const newDevices = devicesRef.current.map(device => ({
-        ...device,
-        temperature: Number((device.temperature + (Math.random() - 0.5)).toFixed(1)),
-        humidity: Number((device.humidity + (Math.random() - 0.5)).toFixed(1)),
-        pressure: Number((device.pressure + (Math.random() - 0.5)).toFixed(1))
-      }));
-      setDevices(newDevices);
-      devicesRef.current = newDevices;
+      setDevicesData(prevDevices => 
+        prevDevices.map(device => {
+          // Generate new readings with random variations
+          const newTemperature = Number((device.temperature + (Math.random() - 0.5) * 4).toFixed(1));
+          const newHumidity = Number((device.humidity + (Math.random() - 0.5) * 10).toFixed(1));
+          const newPressure = Number((device.pressure + (Math.random() - 0.5) * 20).toFixed(1));
+          
+          // Create updated device
+          const updatedDevice = {
+            ...device,
+            temperature: newTemperature,
+            humidity: newHumidity,
+            pressure: newPressure,
+            signalStrength: Math.min(100, Math.max(0, device.signalStrength + (Math.random() - 0.5) * 10)),
+            batteryLevel: Math.min(100, Math.max(0, device.batteryLevel - (Math.random() * 0.5)))
+          };
+          
+          // Check if any readings exceed thresholds
+          if (device.type === 'kit' && device.status === 'Online') {
+            const readings: {
+              temperature?: { value: number; threshold: number; type: 'min' | 'max' };
+              humidity?: { value: number; threshold: number; type: 'min' | 'max' };
+              pressure?: { value: number; threshold: number; type: 'min' | 'max' };
+            } = {};
+            
+            // Check temperature
+            if (newTemperature < THRESHOLDS.temperature.min) {
+              readings.temperature = { 
+                value: newTemperature, 
+                threshold: THRESHOLDS.temperature.min, 
+                type: 'min' 
+              };
+            } else if (newTemperature > THRESHOLDS.temperature.max) {
+              readings.temperature = { 
+                value: newTemperature, 
+                threshold: THRESHOLDS.temperature.max, 
+                type: 'max' 
+              };
+            }
+            
+            // Check humidity
+            if (newHumidity < THRESHOLDS.humidity.min) {
+              readings.humidity = { 
+                value: newHumidity, 
+                threshold: THRESHOLDS.humidity.min, 
+                type: 'min' 
+              };
+            } else if (newHumidity > THRESHOLDS.humidity.max) {
+              readings.humidity = { 
+                value: newHumidity, 
+                threshold: THRESHOLDS.humidity.max, 
+                type: 'max' 
+              };
+            }
+            
+            // Check pressure
+            if (newPressure < THRESHOLDS.pressure.min) {
+              readings.pressure = { 
+                value: newPressure, 
+                threshold: THRESHOLDS.pressure.min, 
+                type: 'min' 
+              };
+            } else if (newPressure > THRESHOLDS.pressure.max) {
+              readings.pressure = { 
+                value: newPressure, 
+                threshold: THRESHOLDS.pressure.max, 
+                type: 'max' 
+              };
+            }
+            
+            // If any reading exceeds thresholds, add to alerts
+            if (Object.keys(readings).length > 0) {
+              const timestamp = new Date().toLocaleTimeString();
+              
+              setThresholdAlerts(prev => [
+                {
+                  deviceId: device.id,
+                  deviceName: device.name,
+                  timestamp,
+                  readings
+                },
+                ...prev.slice(0, 19) // Keep only the last 20 alerts
+              ]);
+            }
+          }
+          
+          return updatedDevice;
+        })
+      );
     }, 5000);
 
     return () => clearInterval(interval);
-  }, []); // No dependencies needed with useRef
+  }, [isClient]);
+
+  // Handle command submission
+  const handleCommandSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commandInput.trim()) return;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    setCommandLog(prev => [
+      { command: commandInput, timestamp },
+      ...prev.slice(0, 9) // Keep only the last 10 commands
+    ]);
+    
+    setCommandInput('');
+  };
 
   return (
     <div className="dashboard-container">
-      <div className="map-section">
-        <Map devices={devices} />
+      <h1 className="dashboard-title">Survival Kit Network Dashboard</h1>
+      
+      <div className="dashboard-content">
+        <div className="map-section">
+          <Map devices={devicesData} />
+        </div>
+        
+        <div className="threshold-alerts-section">
+          <h2 className="section-title">Threshold Alerts</h2>
+          <div className="alerts-list">
+            {thresholdAlerts.length > 0 ? (
+              thresholdAlerts.map((alert, index) => (
+                <div key={index} className="alert-item">
+                  <div className="alert-header">
+                    <span className="alert-device">{alert.deviceName}</span>
+                    <span className="alert-time">{alert.timestamp}</span>
+                  </div>
+                  <div className="alert-readings">
+                    {alert.readings.temperature && (
+                      <div className={`alert-reading ${alert.readings.temperature.type}`}>
+                        Temperature: {alert.readings.temperature.value}°C 
+                        ({alert.readings.temperature.type === 'min' ? 'Below' : 'Above'} threshold: {alert.readings.temperature.threshold}°C)
+                      </div>
+                    )}
+                    {alert.readings.humidity && (
+                      <div className={`alert-reading ${alert.readings.humidity.type}`}>
+                        Humidity: {alert.readings.humidity.value}% 
+                        ({alert.readings.humidity.type === 'min' ? 'Below' : 'Above'} threshold: {alert.readings.humidity.threshold}%)
+                      </div>
+                    )}
+                    {alert.readings.pressure && (
+                      <div className={`alert-reading ${alert.readings.pressure.type}`}>
+                        Pressure: {alert.readings.pressure.value} hPa 
+                        ({alert.readings.pressure.type === 'min' ? 'Below' : 'Above'} threshold: {alert.readings.pressure.threshold} hPa)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="no-alerts">No threshold alerts at this time</div>
+            )}
+          </div>
+        </div>
+        
+        <div className="command-section">
+          <h2 className="section-title">Command Interface</h2>
+          <form onSubmit={handleCommandSubmit} className="command-form">
+            <input
+              type="text"
+              value={commandInput}
+              onChange={(e) => setCommandInput(e.target.value)}
+              placeholder="Enter command..."
+              className="command-input"
+            />
+            <button type="submit" className="command-button">Send</button>
+          </form>
+          
+          <div className="command-log">
+            <h3 className="subsection-title">Command Log</h3>
+            <div className="log-entries">
+              {commandLog.length > 0 ? (
+                commandLog.map((entry, index) => (
+                  <div key={index} className="log-entry">
+                    <span className="log-time">{entry.timestamp}</span>
+                    <span className="log-command">{entry.command}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="no-entries">No commands sent yet</div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
