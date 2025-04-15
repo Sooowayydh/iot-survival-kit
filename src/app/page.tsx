@@ -2,11 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { 
+  AlertTriangle, Send, X, Activity, Battery, Wifi, 
+  Thermometer, Droplets, Gauge, RefreshCw, Settings 
+} from 'lucide-react';
 
 // Dynamically import the Map component with no SSR
 const Map = dynamic(() => import('./components/Map'), {
   ssr: false,
-  loading: () => <div className="map-loading">Loading map...</div>
+  loading: () => (
+    <div className="map-loading">
+      <RefreshCw className="animate-spin mr-2" />
+      Loading map...
+    </div>
+  )
 });
 
 // Define threshold values for alerts
@@ -57,6 +66,10 @@ export default function Home() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [thresholdAlerts, setThresholdAlerts] = useState<ThresholdAlert[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>('Just now');
+  const [alertMode, setAlertMode] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Initialize devices and start monitoring
   useEffect(() => {
@@ -210,7 +223,8 @@ export default function Home() {
               humidity: newHumidity,
               pressure: newPressure,
               signalStrength: Math.min(100, Math.max(0, device.signalStrength + (Math.random() - 0.5) * 10)),
-              batteryLevel: Math.min(100, Math.max(0, device.batteryLevel - (Math.random() * 0.5)))
+              batteryLevel: Math.min(100, Math.max(0, device.batteryLevel - (Math.random() * 0.5))),
+              lastReading: new Date().toLocaleTimeString()
             };
           }
           return device;
@@ -307,116 +321,270 @@ export default function Home() {
     }
   };
 
-  return (
-    <div className="app">
-      <header>
-        <div className="container">
-          <h1>Survival Kit Dashboard</h1>
-        </div>
-      </header>
+  const sendAlertToAllKits = () => {
+    // Implementation of sending an alert to all kits
+    console.log('Alert message:', alertMessage);
+    
+    // Visual feedback
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setAlertMode(false);
+      setAlertMessage('');
       
-      <main>
-        <div className="container">
-          <div className="grid">
-            {/* Map Section */}
-            <div className="card">
-              <div className="card-header">
-                <h2>Location Map</h2>
-              </div>
-              <div className="card-body">
-                <Map devices={devices} />
-              </div>
+      // Add confirmation toast or notification here
+    }, 1000);
+  };
+
+  const handleManualRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      // Simulate updating data
+      setDevices(prevDevices => {
+        return prevDevices.map(device => {
+          if (device.status === 'Online') {
+            return {
+              ...device,
+              temperature: Number((device.temperature + (Math.random() - 0.5) * 2).toFixed(1)),
+              humidity: Number((device.humidity + (Math.random() - 0.5) * 5).toFixed(1)),
+              pressure: Number((device.pressure + (Math.random() - 0.5) * 10).toFixed(1)),
+              lastReading: new Date().toLocaleTimeString()
+            };
+          }
+          return device;
+        });
+      });
+      
+      setLastUpdated('Just now');
+      setIsRefreshing(false);
+    }, 1000);
+  };
+
+  return (
+    <div className="dashboard-container">
+      <header className="dashboard-header">
+        <div className="flex items-center">
+          <h1 className="dashboard-title">Survival Kit Network Dashboard</h1>
+        </div>
+        <div className="dashboard-stats">
+          <div className="stat-card">
+            <Activity className="stat-icon" />
+            <div className="stat-content">
+              <span className="stat-label">Active Devices</span>
+              <span className="stat-value">{devices.filter(d => d.status === 'Online').length}</span>
             </div>
-            
-            {/* Stats Section */}
-            <div className="card">
-              <div className="card-header">
-                <h2>Statistics</h2>
-              </div>
-              <div className="card-body">
-                <div className="stats">
-                  <div className="stat-item blue">
-                    <div className="stat-icon">
-                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <div className="stat-content">
-                      <h3>Active Devices</h3>
-                      <p>{devices.filter(d => d.status === 'Online').length}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="stat-item green">
-                    <div className="stat-icon">
-                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="stat-content">
-                      <h3>System Status</h3>
-                      <p>Operational</p>
-                    </div>
-                  </div>
-                  
-                  <div className="stat-item purple">
-                    <div className="stat-icon">
-                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="stat-content">
-                      <h3>Last Updated</h3>
-                      <p>{lastUpdated}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          </div>
+          <div className="stat-card">
+            <AlertTriangle className="stat-icon text-amber-500" />
+            <div className="stat-content">
+              <span className="stat-label">Active Alerts</span>
+              <span className="stat-value">{thresholdAlerts.length}</span>
             </div>
-            
-            {/* Threshold Alerts Section */}
-            <div className="card">
-              <div className="card-header">
-                <h2>Threshold Alerts</h2>
-              </div>
-              <div className="card-body">
-                <div className="alerts-list">
-                  {thresholdAlerts.length > 0 ? (
-                    thresholdAlerts.map((alert, index) => (
-                      <div key={index} className="alert-item">
-                        <span className="alert-time">{alert.timestamp}</span>
-                        <span className="alert-device">{alert.deviceName}</span>
-                        <div className="alert-readings">
-                          {alert.readings.temperature && (
-                            <div className={`alert-reading ${alert.readings.temperature.type}`}>
-                              <strong>Temperature:</strong> {alert.readings.temperature.value}°C 
-                              ({alert.readings.temperature.type === 'min' ? 'Below' : 'Above'} threshold: {alert.readings.temperature.threshold}°C)
-                            </div>
-                          )}
-                          {alert.readings.humidity && (
-                            <div className={`alert-reading ${alert.readings.humidity.type}`}>
-                              <strong>Humidity:</strong> {alert.readings.humidity.value}% 
-                              ({alert.readings.humidity.type === 'min' ? 'Below' : 'Above'} threshold: {alert.readings.humidity.threshold}%)
-                            </div>
-                          )}
-                          {alert.readings.pressure && (
-                            <div className={`alert-reading ${alert.readings.pressure.type}`}>
-                              <strong>Pressure:</strong> {alert.readings.pressure.value} hPa 
-                              ({alert.readings.pressure.type === 'min' ? 'Below' : 'Above'} threshold: {alert.readings.pressure.threshold} hPa)
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="no-alerts">No threshold alerts. All readings within normal range.</p>
-                  )}
-                </div>
-              </div>
+          </div>
+          <div className="stat-card">
+            <Battery className="stat-icon text-green-500" />
+            <div className="stat-content">
+              <span className="stat-label">Last Updated</span>
+              <span className="stat-value">{lastUpdated}</span>
             </div>
           </div>
         </div>
-      </main>
+      </header>
+
+      <div className="dashboard-grid">
+        <div className="map-section">
+          <Map devices={devices} />
+        </div>
+
+        <div className="dashboard-sidebar">
+          {selectedDevice && (
+            <div className="device-details-panel">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">{selectedDevice.name}</h3>
+                <span className={`status-indicator ${selectedDevice.status === 'Online' ? 'online' : 'offline'}`}>
+                  {selectedDevice.status}
+                </span>
+              </div>
+              
+              <div className="readings-grid">
+                <div className="reading-card">
+                  <Thermometer className="reading-icon text-red-500" />
+                  <div>
+                    <span className="reading-label">Temperature</span>
+                    <span className="reading-value">{selectedDevice.temperature}°C</span>
+                  </div>
+                </div>
+                <div className="reading-card">
+                  <Droplets className="reading-icon text-blue-500" />
+                  <div>
+                    <span className="reading-label">Humidity</span>
+                    <span className="reading-value">{selectedDevice.humidity}%</span>
+                  </div>
+                </div>
+                <div className="reading-card">
+                  <Gauge className="reading-icon text-purple-500" />
+                  <div>
+                    <span className="reading-label">Pressure</span>
+                    <span className="reading-value">{selectedDevice.pressure} hPa</span>
+                  </div>
+                </div>
+                <div className="reading-card">
+                  <Wifi className="reading-icon text-green-500" />
+                  <div>
+                    <span className="reading-label">Signal</span>
+                    <div className="signal-strength">
+                      <div className="signal-bar-container">
+                        <div className="signal-bar" style={{width: `${selectedDevice.signalStrength}%`}}></div>
+                      </div>
+                      <span>{selectedDevice.signalStrength}%</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="reading-card">
+                  <Battery className="reading-icon text-amber-500" />
+                  <div>
+                    <span className="reading-label">Battery</span>
+                    <div className="battery-level">
+                      <div className="battery-bar-container">
+                        <div 
+                          className={`battery-bar ${
+                            selectedDevice.batteryLevel > 70 ? 'bg-green-500' : 
+                            selectedDevice.batteryLevel > 30 ? 'bg-amber-500' : 'bg-red-500'
+                          }`} 
+                          style={{width: `${selectedDevice.batteryLevel}%`}}
+                        ></div>
+                      </div>
+                      <span>{selectedDevice.batteryLevel}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="connections-section mt-4">
+                <h4 className="text-sm font-medium text-gray-500 mb-2">Connected Devices</h4>
+                <div className="connections-list">
+                  {selectedDevice.connectedTo.map(deviceId => {
+                    const connectedDevice = devices.find(d => d.id === deviceId);
+                    return connectedDevice ? (
+                      <div 
+                        key={deviceId} 
+                        className={`connection-item ${connectedDevice.status === 'Online' ? 'online' : 'offline'}`}
+                      >
+                        {connectedDevice.name}
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+              
+              <button 
+                className="close-btn mt-4"
+                onClick={() => setSelectedDevice(null)}
+              >
+                <X className="w-4 h-4" />
+                Close
+              </button>
+            </div>
+          )}
+          
+          <div className="alert-panel">
+            <h3>Command Center Alert System</h3>
+            {!alertMode ? (
+              <button 
+                onClick={() => setAlertMode(true)}
+                className="alert-button"
+              >
+                <AlertTriangle />
+                Send Alert to All Kits
+              </button>
+            ) : (
+              <div className="alert-form">
+                <input
+                  type="text"
+                  placeholder="Enter alert message..."
+                  value={alertMessage}
+                  onChange={(e) => setAlertMessage(e.target.value)}
+                  className="alert-input"
+                />
+                <div className="alert-buttons">
+                  <button 
+                    onClick={sendAlertToAllKits}
+                    className="send-button"
+                    disabled={isRefreshing}
+                  >
+                    {isRefreshing ? (
+                      <RefreshCw className="animate-spin" />
+                    ) : (
+                      <Send />
+                    )}
+                    Send
+                  </button>
+                  <button 
+                    onClick={() => setAlertMode(false)}
+                    className="cancel-button"
+                  >
+                    <X />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="threshold-alerts-panel">
+            <div className="flex justify-between items-center mb-4">
+              <h3>Threshold Alerts</h3>
+              <span className="text-sm text-gray-500">
+                {thresholdAlerts.length} {thresholdAlerts.length === 1 ? 'alert' : 'alerts'}
+              </span>
+            </div>
+            <div className="alerts-list">
+              {thresholdAlerts.length > 0 ? (
+                thresholdAlerts.map((alert, index) => (
+                  <div key={index} className="alert-item">
+                    <div className="alert-header">
+                      <span className="alert-device">{alert.deviceName}</span>
+                      <span className="alert-time">{alert.timestamp}</span>
+                    </div>
+                    <div className="alert-readings">
+                      {alert.readings.temperature && (
+                        <div className={`alert-reading ${alert.readings.temperature.type}`}>
+                          <Thermometer className="w-4 h-4" />
+                          <span>Temperature: {alert.readings.temperature.value}°C</span>
+                          <span>({alert.readings.temperature.type === 'min' ? 'Below' : 'Above'} {alert.readings.temperature.threshold}°C)</span>
+                        </div>
+                      )}
+                      {alert.readings.humidity && (
+                        <div className={`alert-reading ${alert.readings.humidity.type}`}>
+                          <Droplets className="w-4 h-4" />
+                          <span>Humidity: {alert.readings.humidity.value}%</span>
+                          <span>({alert.readings.humidity.type === 'min' ? 'Below' : 'Above'} {alert.readings.humidity.threshold}%)</span>
+                        </div>
+                      )}
+                      {alert.readings.pressure && (
+                        <div className={`alert-reading ${alert.readings.pressure.type}`}>
+                          <Gauge className="w-4 h-4" />
+                          <span>Pressure: {alert.readings.pressure.value}hPa</span>
+                          <span>({alert.readings.pressure.type === 'min' ? 'Below' : 'Above'} {alert.readings.pressure.threshold}hPa)</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="no-alerts">
+                  <div className="flex flex-col items-center justify-center p-6">
+                    <div className="rounded-full bg-gray-100 p-3 mb-2">
+                      <AlertTriangle className="w-6 h-6 text-gray-400" />
+                    </div>
+                    <p>No active alerts</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
