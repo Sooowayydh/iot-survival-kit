@@ -1,0 +1,183 @@
+.map-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    background: #f9f9f9;
+  }
+  
+  /* Custom marker icon container */
+  .custom-icon div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Popup styling */
+  .popup-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .popup-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  
+  .popup-alert,
+  .popup-reading {
+    margin-top: 4px;
+    font-size: 0.9rem;
+    color: #333;
+  }
+  
+  /* Command Center Alert Panel */
+  .alert-panel {
+    background: #fff;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .alert-panel h3 {
+    margin: 0 0 8px;
+    font-size: 1.2rem;
+  }
+  
+  /* Single send button */
+  .alert-panel > button {
+    padding: 10px 16px;
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  
+  .alert-panel > button:hover {
+    background: #2563eb;
+  }
+  
+  /* Input state */
+  .alert-input {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  .alert-input input[type="text"] {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  .alert-input button {
+    padding: 8px 12px;
+    border: none;
+    background: #3b82f6;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .alert-input button:hover {
+    background: #2563eb;
+  }
+  
+  .alert-input button:last-child {
+    background: #ef4444;
+  }
+  
+  .alert-input button:last-child:hover {
+    background: #dc2626;
+  }
+  
+  /* Threshold Alerts & Message Log panels */
+  .threshold-alerts-panel,
+  .message-log-panel {
+    background: #fff;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .threshold-alerts-panel h3,
+  .message-log-panel h3 {
+    margin: 0 0 8px;
+    font-size: 1.2rem;
+  }
+  
+  /* Individual alert and message items */
+  .alert-item,
+  .message-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .alert-item:last-child,
+  .message-item:last-child {
+    border-bottom: none;
+  }
+  
+  .alert-info,
+  .message-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+  }
+  
+  .alert-values {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  
+  .alert-value {
+    background: #eee;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+  }
+  
+  .alert-value.min {
+    background: #d0ebff;
+  }
+  
+  .alert-value.max {
+    background: #ffe3e3;
+  }
+  
+  .no-alerts,
+  .no-messages {
+    text-align: center;
+    color: #999;
+    padding: 8px 0;
+  }
+  
+  .message-body {
+    margin-top: 4px;
+  }
+  
+  .message-path {
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: #666;
+  }
+  
+  .message-time {
+    font-size: 0.75rem;
+    color: #666;
+  }
+  
+  .message-from-to {
+    font-size: 0.875rem;
+    font-weight: bold;
+  }
+  
+  

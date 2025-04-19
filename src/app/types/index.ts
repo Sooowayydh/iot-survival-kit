@@ -10,7 +10,8 @@ export interface Device {
   connectedTo: string[];
   status: 'Online' | 'Offline';
   type: 'official' | 'kit';
-  icon: DivIcon | Icon<IconOptions> | null;
+  iconColor: string;
+  // icon: DivIcon | Icon<IconOptions> | null;
   signalStrength: number;
   batteryLevel: number;
   lastAlert?: string;
