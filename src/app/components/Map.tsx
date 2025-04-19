@@ -38,15 +38,19 @@ interface Message {
   path?: string[];
 }
 
+interface ThresholdReading {
+  value: number;
+  threshold: number;
+  type: "min" | "max";
+}
+
+type SensorType = keyof typeof THRESHOLDS;
+
 interface ThresholdAlert {
   deviceId: string;
   deviceName: string;
   timestamp: string;
-  readings: {
-    temperature?: { value: number; threshold: number; type: "min" | "max" };
-    humidity?: { value: number; threshold: number; type: "min" | "max" };
-    pressure?: { value: number; threshold: number; type: "min" | "max" };
-  };
+  readings: Partial<Record<SensorType, ThresholdReading>>;
 }
 
 export default function Map({
@@ -130,45 +134,51 @@ export default function Map({
 
   // Threshold check
   const checkThresholds = (dev: Device) => {
-    const readings: any = {};
-    if (dev.temperature < THRESHOLDS.temperature.min)
+    const readings: Partial<Record<SensorType, ThresholdReading>> = {};
+
+    if (dev.temperature < THRESHOLDS.temperature.min) {
       readings.temperature = {
         value: dev.temperature,
         threshold: THRESHOLDS.temperature.min,
         type: "min",
       };
-    else if (dev.temperature > THRESHOLDS.temperature.max)
+    } else if (dev.temperature > THRESHOLDS.temperature.max) {
       readings.temperature = {
         value: dev.temperature,
         threshold: THRESHOLDS.temperature.max,
         type: "max",
       };
-    if (dev.humidity < THRESHOLDS.humidity.min)
+    }
+
+    if (dev.humidity < THRESHOLDS.humidity.min) {
       readings.humidity = {
         value: dev.humidity,
         threshold: THRESHOLDS.humidity.min,
         type: "min",
       };
-    else if (dev.humidity > THRESHOLDS.humidity.max)
+    } else if (dev.humidity > THRESHOLDS.humidity.max) {
       readings.humidity = {
         value: dev.humidity,
         threshold: THRESHOLDS.humidity.max,
         type: "max",
       };
-    if (dev.pressure < THRESHOLDS.pressure.min)
+    }
+
+    if (dev.pressure < THRESHOLDS.pressure.min) {
       readings.pressure = {
         value: dev.pressure,
         threshold: THRESHOLDS.pressure.min,
         type: "min",
       };
-    else if (dev.pressure > THRESHOLDS.pressure.max)
+    } else if (dev.pressure > THRESHOLDS.pressure.max) {
       readings.pressure = {
         value: dev.pressure,
         threshold: THRESHOLDS.pressure.max,
         type: "max",
       };
+    }
 
-    if (Object.keys(readings).length) {
+    if (Object.keys(readings).length > 0) {
       const ts = new Date().toLocaleTimeString();
       setThresholdAlerts((prev) => [
         { deviceId: dev.id, deviceName: dev.name, timestamp: ts, readings },
@@ -178,9 +188,8 @@ export default function Map({
         {
           from: dev.name,
           to: "Command Center",
-          message: `ALERT: ${Object
-            .values(readings)
-            .map((r: any) => `${r.type} ${r.value}`)
+          message: `ALERT: ${Object.values(readings)
+            .map((r) => `${r.type} ${r.value}`)
             .join(", ")}`,
           timestamp: ts,
         },
@@ -211,7 +220,7 @@ export default function Map({
         .filter((d) => d.type === "kit")
         .forEach((kit) => {
           const pathNames = findShortestPath(cc.id, kit.id).map(
-            (id) => devices.find((x) => x.id === id)?.name || id
+            (id) => devices.find((x) => x.id === id)!.name
           );
           const ts = new Date().toLocaleTimeString();
           setMessageLog((prev) => [
@@ -239,20 +248,17 @@ export default function Map({
     devices
       .filter((d) => d.type === "kit" && d.status === "Online")
       .forEach((kit) => {
-        // compute route
         const pathIds = findShortestPath(commandCenter.id, kit.id);
         const pathNames = pathIds.map(
-          (id) => devices.find((d) => d.id === id)?.name || id
+          (id) => devices.find((d) => d.id === id)!.name
         );
 
-        // tag lastAlert
         setDevices((prev) =>
           prev.map((d) =>
             d.id === kit.id ? { ...d, lastAlert: alertMessage } : d
           )
         );
 
-        // log outgoing alert
         setMessageLog((prev) => [
           {
             from: commandCenter.name,
@@ -264,7 +270,6 @@ export default function Map({
           ...prev.slice(0, 9),
         ]);
 
-        // simulate kit response
         setTimeout(() => {
           const readingMsg = `Temperature: ${kit.temperature}°C, Humidity: ${kit.humidity}%, Pressure: ${kit.pressure} hPa`;
 
@@ -296,7 +301,8 @@ export default function Map({
 
   // On kit click: draw route & open popup
   const handleKitClick = (kit: Device) => {
-    const pathIds = findShortestPath(kit.id, devices.find((d) => d.type === "official")!.id);
+    const official = devices.find((d) => d.type === "official")!;
+    const pathIds = findShortestPath(kit.id, official.id);
     setRoutePath(pathIds.map((id) => devices.find((d) => d.id === id)!.position));
   };
 
@@ -313,7 +319,7 @@ export default function Map({
           <Marker
             key={d.id}
             position={d.position}
-            icon={createCustomIcon((d as any).iconColor)}
+            icon={createCustomIcon(d.iconColor)}
             eventHandlers={{ click: () => handleKitClick(d) }}
           >
             <Popup>
@@ -344,14 +350,19 @@ export default function Map({
             </Popup>
           </Marker>
         ))}
-        {routePath.length > 1 && <Polyline positions={routePath} color="#3b82f6" />}
+
+        {routePath.length > 1 && (
+          <Polyline positions={routePath} color="#3b82f6" />
+        )}
       </MapContainer>
 
       {/* Alert Panel */}
       <div className="alert-panel">
         <h3>Command Center Alert System</h3>
         {!alertMode ? (
-          <button onClick={() => setAlertMode(true)}>Send Alert to All Kits</button>
+          <button onClick={() => setAlertMode(true)}>
+            Send Alert to All Kits
+          </button>
         ) : (
           <div className="alert-input">
             <input
@@ -361,7 +372,12 @@ export default function Map({
               onChange={(e) => setAlertMessage(e.target.value)}
             />
             <button onClick={sendAlertToAllKits}>Send</button>
-            <button onClick={() => { setAlertMode(false); setAlertMessage(""); }}>
+            <button
+              onClick={() => {
+                setAlertMode(false);
+                setAlertMessage("");
+              }}
+            >
               Cancel
             </button>
           </div>
@@ -379,11 +395,16 @@ export default function Map({
                 <span className="alert-time">{a.timestamp}</span>
               </div>
               <div className="alert-values">
-                {Object.entries(a.readings).map(([k, r]: any) => (
-                  <span key={k} className={`alert-value ${r.type}`}>
-                    {k}: {r.value}
-                  </span>
-                ))}
+                {Object.entries(a.readings).map(([k, r]) =>
+                  r ? (
+                    <span
+                      key={k}
+                      className={`alert-value ${r.type}`}
+                    >
+                      {k}: {r.value}
+                    </span>
+                  ) : null
+                )}
               </div>
             </div>
           ))
@@ -400,10 +421,16 @@ export default function Map({
             <div key={i} className="message-item">
               <div className="message-header">
                 <span className="message-time">{m.timestamp}</span>
-                <span className="message-from-to">{m.from} → {m.to}</span>
+                <span className="message-from-to">
+                  {m.from} → {m.to}
+                </span>
               </div>
               <div className="message-body">{m.message}</div>
-              {m.path && <div className="message-path">Path: {m.path.join(" → ")}</div>}
+              {m.path && (
+                <div className="message-path">
+                  Path: {m.path.join(" → ")}
+                </div>
+              )}
             </div>
           ))
         ) : (
