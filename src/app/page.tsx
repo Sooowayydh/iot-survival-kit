@@ -29,36 +29,31 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="app container mx-auto py-6">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold">Survival Kit Dashboard</h1>
+    <div className="app">
+      <header>
+        <h1>Survival Kit Dashboard</h1>
       </header>
 
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 card">
-          <div className="card-header">
+      <main>
+        <div className="top-section">
+          <div className="map-section">
             <h2>Location Map</h2>
-          </div>
-          <div className="card-body p-0">
-          <div className="map-wrapper">
-                       <Map
-              ref={mapRef}
-              onThresholdAlert={handleThresholdAlert}
-              onNewMessage={handleNewMessage}
-            />
+            <div className="map-wrapper">
+              <Map
+                ref={mapRef}
+                onThresholdAlert={handleThresholdAlert}
+                onNewMessage={handleNewMessage}
+              />
             </div>
           </div>
-        </div>
 
-        <div className="space-y-6">
-          <div className="card">
+          <div className="right-column">
             <AlertPanel
               alertMode={alertMode}
               alertMessage={alertMessage}
               onActivate={() => setAlertMode(true)}
               onMessageChange={setAlertMessage}
               onSend={() => {
-                // THIS is the key: actually call sendAlert on the map
                 mapRef.current?.sendAlert(alertMessage);
                 setAlertMode(false);
                 setAlertMessage("");
@@ -68,17 +63,14 @@ export default function Home() {
                 setAlertMessage("");
               }}
             />
-          </div>
 
-          <div className="card">
             <ThresholdAlertsPanel alerts={thresholdAlerts} />
           </div>
-
-          <div className="card">
-            <MessageLogPanel logs={messageLog} />
-          </div>
         </div>
+
+        <MessageLogPanel logs={messageLog} />
       </main>
     </div>
   );
 }
+
