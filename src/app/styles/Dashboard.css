@@ -1,0 +1,251 @@
+/* src/app/styles/Dashboard.css */
+
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #2980b9;
+    --accent-color: #e74c3c;
+    --background-color: #ecf0f1;
+    --card-bg: #ffffff;
+    --text-color: #34495e;
+    --text-light: #7f8c8d;
+    --border-radius: 8px;
+    --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --transition-speed: 0.3s;
+  }
+  
+  /* Layout */
+  .dashboard-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-gap: 24px;
+    padding: 24px;
+    background-color: var(--background-color);
+    min-height: 100vh;
+  }
+  
+  @media (min-width: 1024px) {
+    .dashboard-container {
+      grid-template-columns: 2fr 1fr;
+    }
+  }
+  
+  .dashboard-header {
+    grid-column: 1 / -1;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary-color);
+  }
+  
+  .dashboard-header h1 {
+    margin: 0;
+    color: var(--primary-color);
+    font-size: 2rem;
+    font-weight: 600;
+  }
+  
+  /* Cards */
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform var(--transition-speed);
+  }
+  
+  .card:hover {
+    transform: translateY(-4px);
+  }
+  
+  .card-header {
+    padding: 16px;
+    background: var(--primary-color);
+  }
+  
+  .card-header h2 {
+    margin: 0;
+    color: #fff;
+    font-size: 1.25rem;
+    font-weight: 500;
+  }
+  
+  .card-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  /* Map */
+  .map-wrapper {
+    position: relative;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+  }
+  
+  .map-wrapper .leaflet-container {
+    height: 100%;
+    width: 100%;
+    border-bottom: 4px solid var(--secondary-color);
+  }
+  
+  /* Panels */
+  .panel {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  /* Alert Panel */
+  .alert-panel {
+    border-left: 4px solid var(--accent-color);
+  }
+  
+  .alert-panel h3 {
+    margin: 0;
+    color: var(--accent-color);
+    font-size: 1.15rem;
+  }
+  
+  .alert-panel .alert-input {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .alert-panel input[type="text"] {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    transition: border-color var(--transition-speed);
+  }
+  
+  .alert-panel input[type="text"]:focus {
+    border-color: var(--secondary-color);
+    outline: none;
+  }
+  
+  .alert-panel button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--border-radius);
+    background: var(--secondary-color);
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background var(--transition-speed);
+  }
+  
+  .alert-panel button:hover {
+    background: #1f618d;
+  }
+  
+  /* Threshold Alerts */
+  .threshold-alerts-panel {
+    border-left: 4px solid var(--secondary-color);
+  }
+  
+  .threshold-alerts-panel h3 {
+    margin: 0;
+    color: var(--secondary-color);
+    font-size: 1.15rem;
+  }
+  
+  .threshold-alerts-panel .alert-item {
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .threshold-alerts-panel .alert-device {
+    font-weight: 500;
+    color: var(--text-color);
+  }
+  
+  .threshold-alerts-panel .alert-time {
+    font-size: 0.875rem;
+    color: var(--text-light);
+  }
+  
+  .threshold-alerts-panel .alert-values {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  
+  .threshold-alerts-panel .alert-value {
+    background: var(--background-color);
+    padding: 4px 8px;
+    border-radius: var(--border-radius);
+    font-size: 0.875rem;
+  }
+  
+  /* Message Log */
+  .message-log-panel {
+    border-left: 4px solid var(--primary-color);
+  }
+  
+  .message-log-panel h3 {
+    margin: 0;
+    color: var(--primary-color);
+    font-size: 1.15rem;
+  }
+  
+  .message-log-panel .message-item {
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .message-log-panel .message-time {
+    font-size: 0.875rem;
+    color: var(--text-light);
+  }
+  
+  .message-log-panel .message-from-to {
+    font-weight: 500;
+    color: var(--text-color);
+  }
+  
+  .message-log-panel .message-body {
+    margin-top: 8px;
+    font-size: 1rem;
+    color: var(--text-color);
+  }
+  
+  .message-log-panel .message-path {
+    margin-top: 8px;
+    font-size: 0.875rem;
+    color: var(--text-light);
+    font-style: italic;
+  }
+  
+  /* Buttons */
+  .button {
+    display: inline-block;
+    padding: 8px 16px;
+    background: var(--secondary-color);
+    color: #fff;
+    text-decoration: none;
+    border-radius: var(--border-radius);
+    transition: background var(--transition-speed);
+  }
+  
+  .button:hover {
+    background: #1f618d;
+  }
+  
+  /* Utility */
+  .text-center {
+    text-align: center;
+  }
+  
+  .hidden {
+    display: none;
+  }
+  
+  

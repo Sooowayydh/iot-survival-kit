@@ -1,80 +1,81 @@
-'use client';
+// src/app/page.tsx
+"use client";
 
-import dynamic from 'next/dynamic';
-
-// Dynamically import the Map component with no SSR
-const Map = dynamic(() => import('./components/Map'), {
+import dynamic from "next/dynamic";
+import { useRef, useState, useCallback } from "react";
+import { AlertPanel } from "./components/AlertPanel";
+import { ThresholdAlertsPanel, ThresholdAlert } from "./components/ThresholdAlertsPanel";
+import { MessageLogPanel, Message } from "./components/MessageLogPanel";
+import type { MapHandle } from "./components/Map";
+import "./styles/Dashboard.css"
+const Map = dynamic(() => import("./components/Map"), {
   ssr: false,
-  loading: () => <div className="map-loading">Loading map...</div>
+  loading: () => <div className="map-loading">Loading map…</div>,
 });
 
 export default function Home() {
+  const mapRef = useRef<MapHandle>(null);
+  const [alertMode, setAlertMode] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+  const [thresholdAlerts, setThresholdAlerts] = useState<ThresholdAlert[]>([]);
+  const [messageLog, setMessageLog] = useState<Message[]>([]);
+
+  const handleThresholdAlert = useCallback((a: ThresholdAlert) => {
+    setThresholdAlerts((prev) => [a, ...prev].slice(0, 20));
+  }, []);
+
+  const handleNewMessage = useCallback((m: Message) => {
+    setMessageLog((prev) => [m, ...prev].slice(0, 10));
+  }, []);
+
   return (
-    <div className="app">
-      <header>
-        <div className="container">
-          <h1>Survival Kit Dashboard</h1>
-        </div>
+    <div className="app container mx-auto py-6">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold">Survival Kit Dashboard</h1>
       </header>
-      
-      <main>
-        <div className="container">
-          <div className="grid">
-            {/* Map Section */}
-            <div className="card">
-              <div className="card-header">
-                <h2>Location Map</h2>
-              </div>
-              <div className="card-body">
-                <Map center={[43.0481, -76.1474]} zoom={13} />
-              </div>
+
+      <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 card">
+          <div className="card-header">
+            <h2>Location Map</h2>
+          </div>
+          <div className="card-body p-0">
+          <div className="map-wrapper">
+                       <Map
+              ref={mapRef}
+              onThresholdAlert={handleThresholdAlert}
+              onNewMessage={handleNewMessage}
+            />
             </div>
-            
-            {/* Stats Section */}
-            <div className="card">
-              <div className="card-header">
-                <h2>Statistics</h2>
-              </div>
-              <div className="card-body">
-                <div className="stats">
-                  <div className="stat-item blue">
-                    <div className="stat-icon">
-                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <div className="stat-content">
-                      <h3>Active Devices</h3>
-                      <p>9</p>
-                    </div>
-                  </div>
-                  
-                  <div className="stat-item green">
-                    <div className="stat-icon">
-                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="stat-content">
-                      <h3>System Status</h3>
-                      <p>Operational</p>
-                    </div>
-                  </div>
-                  
-                  <div className="stat-item purple">
-                    <div className="stat-icon">
-                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="stat-content">
-                      <h3>Last Updated</h3>
-                      <p>2 min ago</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="card">
+            <AlertPanel
+              alertMode={alertMode}
+              alertMessage={alertMessage}
+              onActivate={() => setAlertMode(true)}
+              onMessageChange={setAlertMessage}
+              onSend={() => {
+                // THIS is the key: actually call sendAlert on the map
+                mapRef.current?.sendAlert(alertMessage);
+                setAlertMode(false);
+                setAlertMessage("");
+              }}
+              onCancel={() => {
+                setAlertMode(false);
+                setAlertMessage("");
+              }}
+            />
+          </div>
+
+          <div className="card">
+            <ThresholdAlertsPanel alerts={thresholdAlerts} />
+          </div>
+
+          <div className="card">
+            <MessageLogPanel logs={messageLog} />
           </div>
         </div>
       </main>
