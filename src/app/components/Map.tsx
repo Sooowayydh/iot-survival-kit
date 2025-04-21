@@ -19,7 +19,8 @@ import L, { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./Map.css";
 import { Device } from "../types";
-import { devices as initialDevices } from "./devices";
+import { getDevices } from "./devices";
+import { SENSOR_THRESHOLDS } from "./thingspeak";
 
 // Icon factory: colored circle
 const createCustomIcon = (color: string) =>
@@ -56,13 +57,14 @@ interface ThresholdReading {
   value: number;
   threshold: number;
   type: "min" | "max";
+  unit?: string;
 }
 
 export interface ThresholdAlert {
   deviceId: string;
   deviceName: string;
   timestamp: string;
-  readings: Partial<Record<keyof typeof THRESHOLDS, ThresholdReading>>;
+  readings: Partial<Record<keyof typeof SENSOR_THRESHOLDS, ThresholdReading>>;
 }
 
 export interface MapHandle {
@@ -87,8 +89,25 @@ const Map = forwardRef<MapHandle, MapProps>(
     },
     ref
   ) => {
-    const [devices, setDevices] = useState<Device[]>(initialDevices);
+    const [devices, setDevices] = useState<Device[]>([]);
     const [routePath, setRoutePath] = useState<LatLngTuple[]>([]);
+
+    // Fetch devices data
+    const fetchDevices = useCallback(async () => {
+      try {
+        const updatedDevices = await getDevices();
+        setDevices(updatedDevices);
+      } catch (error) {
+        console.error('Error fetching devices:', error);
+      }
+    }, []);
+
+    // Initial fetch and setup refresh interval
+    useEffect(() => {
+      fetchDevices();
+      const interval = setInterval(fetchDevices, 30000); // Refresh every 30 seconds
+      return () => clearInterval(interval);
+    }, [fetchDevices]);
 
     // Haversine distance helper
     const calcGeoDistance = (
@@ -107,7 +126,7 @@ const Map = forwardRef<MapHandle, MapProps>(
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
-    // Dijkstra’s algorithm
+    // Dijkstra's algorithm
     const findShortestPath = useCallback(
       (startId: string, endId: string) => {
         const dist: Record<string, number> = {};
@@ -156,51 +175,27 @@ const Map = forwardRef<MapHandle, MapProps>(
     // Check and emit threshold alerts
     const checkThresholds = useCallback(
       (dev: Device) => {
-        const readings: Partial<
-          Record<keyof typeof THRESHOLDS, ThresholdReading>
-        > = {};
+        const readings: Partial<Record<keyof typeof SENSOR_THRESHOLDS, ThresholdReading>> = {};
 
-        if (dev.temperature < THRESHOLDS.temperature.min) {
-          readings.temperature = {
-            value: dev.temperature,
-            threshold: THRESHOLDS.temperature.min,
-            type: "min",
-          };
-        } else if (dev.temperature > THRESHOLDS.temperature.max) {
-          readings.temperature = {
-            value: dev.temperature,
-            threshold: THRESHOLDS.temperature.max,
-            type: "max",
-          };
-        }
-
-        if (dev.humidity < THRESHOLDS.humidity.min) {
-          readings.humidity = {
-            value: dev.humidity,
-            threshold: THRESHOLDS.humidity.min,
-            type: "min",
-          };
-        } else if (dev.humidity > THRESHOLDS.humidity.max) {
-          readings.humidity = {
-            value: dev.humidity,
-            threshold: THRESHOLDS.humidity.max,
-            type: "max",
-          };
-        }
-
-        if (dev.pressure < THRESHOLDS.pressure.min) {
-          readings.pressure = {
-            value: dev.pressure,
-            threshold: THRESHOLDS.pressure.min,
-            type: "min",
-          };
-        } else if (dev.pressure > THRESHOLDS.pressure.max) {
-          readings.pressure = {
-            value: dev.pressure,
-            threshold: THRESHOLDS.pressure.max,
-            type: "max",
-          };
-        }
+        // Check all sensor thresholds
+        Object.entries(SENSOR_THRESHOLDS).forEach(([sensor, { min, max }]) => {
+          const value = dev[sensor as keyof Device] as number;
+          if (value < min) {
+            readings[sensor as keyof typeof SENSOR_THRESHOLDS] = {
+              value,
+              threshold: min,
+              type: "min",
+              unit: getUnitForSensor(sensor),
+            };
+          } else if (value > max) {
+            readings[sensor as keyof typeof SENSOR_THRESHOLDS] = {
+              value,
+              threshold: max,
+              type: "max",
+              unit: getUnitForSensor(sensor),
+            };
+          }
+        });
 
         if (Object.keys(readings).length > 0) {
           const ts = new Date().toLocaleTimeString();
@@ -213,18 +208,40 @@ const Map = forwardRef<MapHandle, MapProps>(
           const msgPayload: Message = {
             from: dev.name,
             to: "Command Center",
-            message: `Alert: ${Object.values(readings)
-              .map((r) => `${r.type} ${r.value}`)
+            message: `Alert: ${Object.entries(readings)
+              .map(([sensor, reading]) => 
+                `${sensor}: ${reading.value}${reading.unit || ''} (${reading.type} threshold: ${reading.threshold}${reading.unit || ''})`
+              )
               .join(", ")}`,
             timestamp: ts,
           };
-          // defer calls so parent state isn't updated during render
           setTimeout(() => onThresholdAlert?.(alertPayload), 0);
           setTimeout(() => onNewMessage?.(msgPayload), 0);
         }
       },
       [onThresholdAlert, onNewMessage]
     );
+
+    // Helper function to get units for sensors
+    function getUnitForSensor(sensor: string): string {
+      switch (sensor) {
+        case 'temperature':
+          return '°C';
+        case 'humidity':
+          return '%';
+        case 'pressure':
+          return 'hPa';
+        case 'airQuality':
+          return ' IAQ';
+        case 'coLevel':
+        case 'combustibleGas':
+          return ' ppm';
+        case 'waterQuality':
+          return ' ppm';
+        default:
+          return '';
+      }
+    }
 
     // Imperative sendAlert method
     const sendAlertToAllKits = useCallback(
@@ -290,6 +307,9 @@ const Map = forwardRef<MapHandle, MapProps>(
       const iv = setInterval(() => {
         setDevices((ds) =>
           ds.map((d) => {
+            // Skip random variations for Kit 3 (id: "4")
+            if (d.id === "4") return d;
+
             const upd = {
               ...d,
               temperature: +(
@@ -365,6 +385,10 @@ const Map = forwardRef<MapHandle, MapProps>(
                   <div>Temperature: {d.temperature}°C</div>
                   <div>Humidity: {d.humidity}%</div>
                   <div>Pressure: {d.pressure} hPa</div>
+                  <div>Air Quality: {d.airQuality} IAQ</div>
+                  <div>CO Level: {d.coLevel} ppm</div>
+                  <div>Combustible Gas: {d.combustibleGas} ppm</div>
+                  <div>Water Quality: {d.waterQuality} ppm</div>
                   <div>Signal Strength: {d.signalStrength}%</div>
                   <div>Battery Level: {d.batteryLevel}%</div>
                 </div>
