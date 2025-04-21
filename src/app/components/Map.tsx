@@ -379,4 +379,6 @@ const Map = forwardRef<MapHandle, MapProps>(
   }
 );
 
+Map.displayName = "Map";
+
 export default Map;
