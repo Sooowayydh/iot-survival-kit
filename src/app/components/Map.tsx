@@ -22,29 +22,6 @@ import { Device } from "../types";
 import { getDevices } from "./devices";
 import { SENSOR_THRESHOLDS } from "./thingspeak";
 
-// Icon factory: colored circle
-const createCustomIcon = (color: string) =>
-  L.divIcon({
-    className: "custom-icon",
-    html: `<div style="
-      background-color: ${color};
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      border: 2px solid #fff;
-      box-shadow: 0 0 5px rgba(0,0,0,0.3);
-    "></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-  });
-
-// Threshold values
-const THRESHOLDS = {
-  temperature: { min: 15, max: 30 },
-  humidity: { min: 40, max: 80 },
-  pressure: { min: 980, max: 1020 },
-};
-
 export interface Message {
   from: string;
   to: string;
@@ -65,6 +42,7 @@ export interface ThresholdAlert {
   deviceName: string;
   timestamp: string;
   readings: Partial<Record<keyof typeof SENSOR_THRESHOLDS, ThresholdReading>>;
+  fullReadings: string;
 }
 
 export interface MapHandle {
@@ -77,6 +55,43 @@ interface MapProps {
   zoom?: number;
   onThresholdAlert?: (alert: ThresholdAlert) => void;
   onNewMessage?: (msg: Message) => void;
+}
+
+// Icon factory: colored circle
+const createCustomIcon = (color: string) =>
+  L.divIcon({
+    className: "custom-icon",
+    html: `<div style="
+      background-color: ${color};
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    "></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+
+// Helper to get units
+function getUnitForSensor(sensor: string): string {
+  switch (sensor) {
+    case "temperature":
+      return "°C";
+    case "humidity":
+      return "%";
+    case "pressure":
+      return " hPa";
+    case "airQuality":
+      return " IAQ";
+    case "coLevel":
+    case "combustibleGas":
+      return " ppm";
+    case "waterQuality":
+      return " ppm";
+    default:
+      return "";
+  }
 }
 
 const Map = forwardRef<MapHandle, MapProps>(
@@ -92,24 +107,83 @@ const Map = forwardRef<MapHandle, MapProps>(
     const [devices, setDevices] = useState<Device[]>([]);
     const [routePath, setRoutePath] = useState<LatLngTuple[]>([]);
 
-    // Fetch devices data
+    // Check thresholds
+    const checkThresholds = useCallback(
+      (dev: Device) => {
+        const readings: Partial<
+          Record<keyof typeof SENSOR_THRESHOLDS, ThresholdReading>
+        > = {};
+
+        Object.entries(SENSOR_THRESHOLDS).forEach(([sensor, { min, max }]) => {
+          const value = dev[sensor as keyof Device] as number;
+          if (value < min) {
+            readings[sensor as keyof typeof SENSOR_THRESHOLDS] = {
+              value,
+              threshold: min,
+              type: "min",
+              unit: getUnitForSensor(sensor),
+            };
+          } else if (value > max) {
+            readings[sensor as keyof typeof SENSOR_THRESHOLDS] = {
+              value,
+              threshold: max,
+              type: "max",
+              unit: getUnitForSensor(sensor),
+            };
+          }
+        });
+
+        if (Object.keys(readings).length > 0) {
+          const ts = new Date().toLocaleTimeString();
+          const fullReadings = Object.entries(SENSOR_THRESHOLDS)
+            .map(([sensor]) => {
+              const v = dev[sensor as keyof Device] as number;
+              const u = getUnitForSensor(sensor);
+              return `${sensor}: ${v}${u}`;
+            })
+            .join(", ");
+
+          const alertPayload: ThresholdAlert = {
+            deviceId: dev.id,
+            deviceName: dev.name,
+            timestamp: ts,
+            readings,
+            fullReadings,
+          };
+          const msgPayload: Message = {
+            from: dev.name,
+            to: "Command Center",
+            message: fullReadings,
+            timestamp: ts,
+          };
+
+          setTimeout(() => onThresholdAlert?.(alertPayload), 0);
+          setTimeout(() => onNewMessage?.(msgPayload), 0);
+        }
+      },
+      [onThresholdAlert, onNewMessage]
+    );
+
+    // Fetch devices and run checks
     const fetchDevices = useCallback(async () => {
       try {
-        const updatedDevices = await getDevices();
-        setDevices(updatedDevices);
-      } catch (error) {
-        console.error('Error fetching devices:', error);
+        const updated = await getDevices();
+        setDevices(updated);
+        updated.forEach((d) => {
+          if (d.type === "kit") checkThresholds(d);
+        });
+      } catch (err) {
+        console.error("Error fetching devices:", err);
       }
-    }, []);
+    }, [checkThresholds]);
 
-    // Initial fetch and setup refresh interval
     useEffect(() => {
       fetchDevices();
-      const interval = setInterval(fetchDevices, 30000); // Refresh every 30 seconds
-      return () => clearInterval(interval);
+      const iv = setInterval(fetchDevices, 30000);
+      return () => clearInterval(iv);
     }, [fetchDevices]);
 
-    // Haversine distance helper
+    // Distance helper
     const calcGeoDistance = (
       [lat1, lng1]: LatLngTuple,
       [lat2, lng2]: LatLngTuple
@@ -126,7 +200,7 @@ const Map = forwardRef<MapHandle, MapProps>(
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
-    // Dijkstra's algorithm
+    // Dijkstra’s for routing
     const findShortestPath = useCallback(
       (startId: string, endId: string) => {
         const dist: Record<string, number> = {};
@@ -153,7 +227,8 @@ const Map = forwardRef<MapHandle, MapProps>(
             const neighbor = devices.find((d) => d.id === nid);
             if (!neighbor || neighbor.status !== "Online") return;
             const alt =
-              dist[current] + calcGeoDistance(cd.position, neighbor.position);
+              dist[current] +
+              calcGeoDistance(cd.position, neighbor.position);
             if (alt < dist[nid]) {
               dist[nid] = alt;
               prev[nid] = current;
@@ -172,82 +247,11 @@ const Map = forwardRef<MapHandle, MapProps>(
       [devices]
     );
 
-    // Check and emit threshold alerts
-    const checkThresholds = useCallback(
-      (dev: Device) => {
-        const readings: Partial<Record<keyof typeof SENSOR_THRESHOLDS, ThresholdReading>> = {};
-
-        // Check all sensor thresholds
-        Object.entries(SENSOR_THRESHOLDS).forEach(([sensor, { min, max }]) => {
-          const value = dev[sensor as keyof Device] as number;
-          if (value < min) {
-            readings[sensor as keyof typeof SENSOR_THRESHOLDS] = {
-              value,
-              threshold: min,
-              type: "min",
-              unit: getUnitForSensor(sensor),
-            };
-          } else if (value > max) {
-            readings[sensor as keyof typeof SENSOR_THRESHOLDS] = {
-              value,
-              threshold: max,
-              type: "max",
-              unit: getUnitForSensor(sensor),
-            };
-          }
-        });
-
-        if (Object.keys(readings).length > 0) {
-          const ts = new Date().toLocaleTimeString();
-          const alertPayload: ThresholdAlert = {
-            deviceId: dev.id,
-            deviceName: dev.name,
-            timestamp: ts,
-            readings,
-          };
-          const msgPayload: Message = {
-            from: dev.name,
-            to: "Command Center",
-            message: `Alert: ${Object.entries(readings)
-              .map(([sensor, reading]) => 
-                `${sensor}: ${reading.value}${reading.unit || ''} (${reading.type} threshold: ${reading.threshold}${reading.unit || ''})`
-              )
-              .join(", ")}`,
-            timestamp: ts,
-          };
-          setTimeout(() => onThresholdAlert?.(alertPayload), 0);
-          setTimeout(() => onNewMessage?.(msgPayload), 0);
-        }
-      },
-      [onThresholdAlert, onNewMessage]
-    );
-
-    // Helper function to get units for sensors
-    function getUnitForSensor(sensor: string): string {
-      switch (sensor) {
-        case 'temperature':
-          return '°C';
-        case 'humidity':
-          return '%';
-        case 'pressure':
-          return 'hPa';
-        case 'airQuality':
-          return ' IAQ';
-        case 'coLevel':
-        case 'combustibleGas':
-          return ' ppm';
-        case 'waterQuality':
-          return ' ppm';
-        default:
-          return '';
-      }
-    }
-
-    // Imperative sendAlert method
+    // Broadcast alert
     const sendAlertToAllKits = useCallback(
       (message: string) => {
         if (!message.trim()) return;
-        const timestamp = new Date().toLocaleTimeString();
+        const ts = new Date().toLocaleTimeString();
         const cc = devices.find((d) => d.type === "official");
         if (!cc) return;
 
@@ -269,13 +273,20 @@ const Map = forwardRef<MapHandle, MapProps>(
               from: cc.name,
               to: kit.name,
               message: `ALERT: ${message}`,
-              timestamp,
+              timestamp: ts,
               path: pathNames.length > 1 ? pathNames : undefined,
             });
 
-            // simulate kit response
             setTimeout(() => {
-              const readingMsg = `Temperature: ${kit.temperature}°C, Humidity: ${kit.humidity}%, Pressure: ${kit.pressure} hPa`;
+              const readingMsg = [
+                `Temperature: ${kit.temperature}°C`,
+                `Humidity: ${kit.humidity}%`,
+                `Pressure: ${kit.pressure} hPa`,
+                `Air Quality: ${kit.airQuality} IAQ`,
+                `CO Level: ${kit.coLevel} ppm`,
+                `Gas: ${kit.combustibleGas} ppm`,
+                `Water: ${kit.waterQuality} ppm`,
+              ].join(", ");
               setDevices((prev) =>
                 prev.map((d) =>
                   d.id === kit.id ? { ...d, lastReading: readingMsg } : d
@@ -297,61 +308,61 @@ const Map = forwardRef<MapHandle, MapProps>(
       [devices, findShortestPath, onNewMessage]
     );
 
-    // expose sendAlert via ref
-    useImperativeHandle(ref, () => ({ sendAlert: sendAlertToAllKits }), [
-      sendAlertToAllKits,
-    ]);
+    useImperativeHandle(
+      ref,
+      () => ({ sendAlert: sendAlertToAllKits }),
+      [sendAlertToAllKits]
+    );
 
-    // simulate metrics & kit→CC messages
+    // Simulate periodic updates
     useEffect(() => {
       const iv = setInterval(() => {
-        setDevices((ds) =>
-          ds.map((d) => {
-            // Skip random variations for Kit 3 (id: "4")
+        setDevices((prev) => {
+          const updated = prev.map((d) => {
             if (d.id === "4") return d;
+            const temp = +(d.temperature + (Math.random() - 0.5) * 4).toFixed(1);
+            const hum = +(d.humidity + (Math.random() - 0.5) * 4).toFixed(1);
+            const pres = +(d.pressure + (Math.random() - 0.5) * 4).toFixed(1);
+            const newDev = { ...d, temperature: temp, humidity: hum, pressure: pres };
+            if (d.type === "kit") checkThresholds(newDev);
+            return newDev;
+          });
 
-            const upd = {
-              ...d,
-              temperature: +(
-                d.temperature +
-                (Math.random() - 0.5) * 4
-              ).toFixed(1),
-              humidity: +((d.humidity + (Math.random() - 0.5) * 4).toFixed(1)),
-              pressure: +((d.pressure + (Math.random() - 0.5) * 4).toFixed(1)),
-            };
-            if (d.type === "kit") checkThresholds(upd);
-            return upd;
-          })
-        );
-
-        const cc = devices.find((d) => d.type === "official");
-        if (!cc) return;
-
-        devices
-          .filter((d) => d.type === "kit")
-          .forEach((kit) => {
-            const pathIds = findShortestPath(cc.id, kit.id);
-            const pathNames = pathIds.map(
-              (id) => devices.find((d) => d.id === id)!.name
-            );
-            const ts = new Date().toLocaleTimeString();
-            setTimeout(
-              () =>
+          const cc = updated.find((d) => d.type === "official");
+          if (cc) {
+            updated
+              .filter((d) => d.type === "kit")
+              .forEach((kit) => {
+                const pathIds = findShortestPath(cc.id, kit.id);
+                const pathNames = pathIds.map(
+                  (id) => updated.find((dd) => dd.id === id)!.name
+                );
+                const tmsg = [
+                  `Temperature: ${kit.temperature}°C`,
+                  `Humidity: ${kit.humidity}%`,
+                  `Pressure: ${kit.pressure} hPa`,
+                  `Air Quality: ${kit.airQuality} IAQ`,
+                  `CO Level: ${kit.coLevel} ppm`,
+                  `Gas: ${kit.combustibleGas} ppm`,
+                  `Water: ${kit.waterQuality} ppm`,
+                ].join(", ");
                 onNewMessage?.({
                   from: kit.name,
                   to: cc.name,
-                  message: `T:${kit.temperature} H:${kit.humidity}`,
-                  timestamp: ts,
+                  message: tmsg,
+                  timestamp: new Date().toLocaleTimeString(),
                   path: pathNames,
-                }),
-              0
-            );
-          });
+                });
+              });
+          }
+
+          return updated;
+        });
       }, 10000);
       return () => clearInterval(iv);
-    }, [devices, findShortestPath, checkThresholds, onNewMessage]);
+    }, [checkThresholds, findShortestPath, onNewMessage]);
 
-    // kit click → draw route
+    // Draw route on click
     const handleKitClick = (kit: Device) => {
       const cc = devices.find((d) => d.type === "official");
       if (!cc) return;

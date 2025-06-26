@@ -1,5 +1,6 @@
 // src/app/components/ThresholdAlertsPanel.tsx
 "use client";
+
 import React from "react";
 
 interface ThresholdReading {
@@ -13,6 +14,7 @@ export interface ThresholdAlert {
   deviceName: string;
   timestamp: string;
   readings: Partial<Record<string, ThresholdReading>>;
+  fullReadings: string;
 }
 
 export interface ThresholdAlertsPanelProps {
@@ -33,10 +35,17 @@ export const ThresholdAlertsPanel: React.FC<ThresholdAlertsPanelProps> = ({ aler
             {Object.entries(a.readings).map(([k, r]) =>
               r ? (
                 <span key={k} className={`alert-value ${r.type}`}>
-                  {k}: {r.value}
+                  {k}: {r.value}{r.unit || ""}
                 </span>
               ) : null
             )}
+          </div>
+          <div className="alert-values" style={{ marginTop: "8px" }}>
+            {a.fullReadings.split(",").map((entry, j) => (
+              <span key={j} className="alert-value">
+                {entry.trim()}
+              </span>
+            ))}
           </div>
         </div>
       ))
