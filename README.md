@@ -113,12 +113,21 @@ Water Quality:  0 - 1000 ppm TDS
 ## 🔧 Configuration
 
 ### ThingSpeak Setup
-The application connects to ThingSpeak channel `2925202` for live IoT data. Update the configuration in `src/app/components/thingspeak.ts`:
+The application connects to ThingSpeak for live IoT data. Configure your API credentials using environment variables:
 
-```typescript
-const THINGSPEAK_CHANNEL_ID = "2925202";
-const THINGSPEAK_API_KEY = "HMV972GTSEJJB3FZ";
+1. Create a `.env.local` file in the root directory:
+```bash
+NEXT_PUBLIC_THINGSPEAK_CHANNEL_ID=your_channel_id
+NEXT_PUBLIC_THINGSPEAK_API_KEY=your_api_key
 ```
+
+2. Update `src/app/components/thingspeak.ts` to use environment variables:
+```typescript
+const THINGSPEAK_CHANNEL_ID = process.env.NEXT_PUBLIC_THINGSPEAK_CHANNEL_ID;
+const THINGSPEAK_API_KEY = process.env.NEXT_PUBLIC_THINGSPEAK_API_KEY;
+```
+
+⚠️ **Security Note**: Never commit API keys to version control. Add `.env.local` to your `.gitignore` file.
 
 ### Device Configuration
 Survival kit locations and configurations are managed in `src/app/components/devices.ts`. Each device includes:
@@ -193,18 +202,3 @@ The dashboard is fully responsive and works on:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
-
-This project is part of an IoT emergency management system. Please ensure proper attribution when using or modifying this code.
-
-## 🆘 Support
-
-For technical support or questions about the survival kit dashboard:
-- Check the console for error messages
-- Verify ThingSpeak API connectivity
-- Ensure all dependencies are properly installed
-- Review device configurations in `devices.ts`
-
----
-
-**Emergency Contact**: This system is designed for emergency preparedness and response coordination.

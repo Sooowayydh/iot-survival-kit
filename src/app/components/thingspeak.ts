@@ -41,11 +41,15 @@ export const SENSOR_THRESHOLDS = {
     waterQuality: { min: 0, max: 1000 },  // TDS in ppm
 };
 
-const THINGSPEAK_CHANNEL_ID = "2925202";
-const THINGSPEAK_API_KEY = "HMV972GTSEJJB3FZ";
+const THINGSPEAK_CHANNEL_ID = process.env.NEXT_PUBLIC_THINGSPEAK_CHANNEL_ID || "2925202";
+const THINGSPEAK_API_KEY = process.env.NEXT_PUBLIC_THINGSPEAK_API_KEY;
 const THINGSPEAK_API_URL = `https://api.thingspeak.com/channels/${THINGSPEAK_CHANNEL_ID}/feeds.json`;
 
 export async function fetchThingSpeakData(): Promise<ThingSpeakResponse> {
+    if (!THINGSPEAK_API_KEY) {
+        throw new Error('ThingSpeak API key not configured. Please set NEXT_PUBLIC_THINGSPEAK_API_KEY environment variable.');
+    }
+
     try {
         const response = await fetch(`${THINGSPEAK_API_URL}?api_key=${THINGSPEAK_API_KEY}&results=1`);
         if (!response.ok) {
